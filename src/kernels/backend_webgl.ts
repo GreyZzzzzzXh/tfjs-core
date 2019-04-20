@@ -62,6 +62,8 @@ import {ConcatPackedProgram} from './webgl/concat_packed_gpu';
 import {Conv2DDerFilterProgram, Conv2DDerInputProgram, Conv3DDerFilterProgram, Conv3DDerInputProgram} from './webgl/conv_backprop_gpu';
 import {DepthwiseConv2DDerFilterProgram, DepthwiseConv2DDerInputProgram} from './webgl/conv_backprop_gpu_depthwise';
 import {Conv2DProgram, Conv3DProgram} from './webgl/conv_gpu';
+// import {Conv2DProgramCS} from './webgl/conv_gpu_cs';
+import {Conv2DProgramCS} from './webgl/conv_gpu_cs_v2';
 import {DepthwiseConv2DProgram} from './webgl/conv_gpu_depthwise';
 import {DepthwiseConvPacked2DProgram} from './webgl/conv_packed_gpu_depthwise';
 import {CropAndResizeProgram} from './webgl/crop_and_resize_gpu';
@@ -1837,6 +1839,16 @@ export class MathBackendWebGL implements KernelBackend {
     if (ENV.get('WEBGL_CONV_IM2COL') && x.shape[0] === 1) {
       return this.conv2dWithIm2Row(x, filter, convInfo);
     }
+
+    if (convInfo.strideHeight === 2 && convInfo.strideWidth === 2 &&
+        convInfo.dilationHeight === 1 && convInfo.dilationWidth === 1 &&
+        convInfo.padInfo.top === 0 && convInfo.padInfo.left === 0 &&
+        convInfo.filterHeight === 3 && convInfo.filterWidth === 3 &&
+        convInfo.batchSize === 1) {
+      const program = new Conv2DProgramCS(convInfo);
+      return this.compileAndRunCS(program, [x, filter]);
+    }
+
     const program = new Conv2DProgram(convInfo);
     return this.compileAndRunCS(program, [x, filter]);
   }
