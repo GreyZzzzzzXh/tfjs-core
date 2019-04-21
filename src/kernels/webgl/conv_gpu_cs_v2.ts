@@ -22,7 +22,7 @@ export class Conv2DProgramCS implements GPGPUProgram {
   variableNames = ['x', 'W'];
   outputShape: number[];
   userCode: string;
-  localGroupSize = [8 /* outChannels */, 16];
+  localGroupSize = [8, 7];  // x, y
 
   constructor(convInfo: Conv2DInfo) {
     this.outputShape = convInfo.outShape;
@@ -30,48 +30,46 @@ export class Conv2DProgramCS implements GPGPUProgram {
     const padLeft = convInfo.padInfo.left;
     const strideHeight = convInfo.strideHeight;
     const strideWidth = convInfo.strideWidth;
-    const dilationHeight = convInfo.dilationHeight;
+    const dilationHeight =
+        convInfo.dilationHeight;  // dilationHeight/Width should be 1
     const dilationWidth = convInfo.dilationWidth;
     const filterHeight = convInfo.filterHeight;
     const filterWidth = convInfo.filterWidth;
 
     const inputDepthNearestVec4 = Math.floor(convInfo.inChannels / 4) * 4;
     const inputDepthVec4Remainder = convInfo.inChannels % 4;
-    const BLOCK_SIZE = this.localGroupSize[1];  // 16
+    const BLOCK_SIZE =
+        this.localGroupSize[1];  // outWidth should be divisible by BLOCK_SIZE
 
     this.userCode = `
       const ivec2 strides = ivec2(${strideHeight}, ${strideWidth});
       const ivec2 pads = ivec2(${padTop}, ${padLeft});
 
-      const int cacheH = 3;
-      const int cacheW = ${BLOCK_SIZE * strideWidth + 1};
+      const int cacheH = ${filterHeight};
+      const int cacheW = ${(BLOCK_SIZE - 1) * strideWidth + filterWidth};
       const int cacheC = ${convInfo.inChannels};
       const int cacheHW = cacheH * cacheW;
       // Combine cacheW and cacheC
       shared float cache[cacheH][cacheW * cacheC];
 
       void main() {
-        ivec4 coords = getOutputCoords();
+        ivec4 coords = getFirstThreadOutputCoords();
         int batch = coords[0];
-        int d2 = coords[3];
-
-        ivec2 xRCCorner = coords.yz * strides - pads;
-        int xRCorner = xRCCorner.x;
-        int xCCorner = xRCCorner.y;
-
-        ivec2 cacheRCCorner = ivec2(coords.y,
-          ${BLOCK_SIZE} * (coords.z / ${BLOCK_SIZE})) * strides;
+        ivec2 cacheRCCorner = coords.yz * strides - pads;
         int cacheRCorner = cacheRCCorner.x;
         int cacheCCorner = cacheRCCorner.y;
 
         // Fill cache
+        // TODO: Use all threads to fill cache
         int index = int(gl_LocalInvocationIndex);
         if (index < cacheHW) {
           int row = index / cacheW;
           int col = imod(index, cacheW);
 
-          if (((cacheRCorner + row) < ${convInfo.inHeight}) &&
-              ((cacheCCorner + col) < ${convInfo.inWidth})) {
+          if ((cacheRCorner + row) >= 0 &&
+              (cacheCCorner + col) >= 0 &&
+              (cacheRCorner + row) < ${convInfo.inHeight} &&
+              (cacheCCorner + col) < ${convInfo.inWidth}) {
             for (int i = 0; i < ${convInfo.inChannels}; i++) {
               cache[row][col * ${convInfo.inChannels} + i] =
                   getX(batch, cacheRCorner + row, cacheCCorner + col, i);
@@ -81,6 +79,17 @@ export class Conv2DProgramCS implements GPGPUProgram {
 
         memoryBarrierShared();
         barrier();
+
+        // Discard threads that are out of bounds
+        if (int(gl_GlobalInvocationID.x) >= ${convInfo.outChannels}) {
+          return;
+        }
+
+        coords = getOutputCoords();
+        int d2 = coords[3];
+        ivec2 xRCCorner = coords.yz * strides - pads;
+        int xRCorner = xRCCorner.x;
+        int xCCorner = xRCCorner.y;
 
         // Convolve x(?, ?, d1) with w(:, :, d1, d2) to get y(yR, yC, d2).
         // ? = to be determined. : = across all values in that axis.

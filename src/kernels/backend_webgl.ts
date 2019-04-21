@@ -1840,11 +1840,14 @@ export class MathBackendWebGL implements KernelBackend {
       return this.conv2dWithIm2Row(x, filter, convInfo);
     }
 
-    if (convInfo.strideHeight === 2 && convInfo.strideWidth === 2 &&
-        convInfo.dilationHeight === 1 && convInfo.dilationWidth === 1 &&
-        convInfo.padInfo.top === 0 && convInfo.padInfo.left === 0 &&
-        convInfo.filterHeight === 3 && convInfo.filterWidth === 3 &&
-        convInfo.batchSize === 1) {
+    const maxTexSize = ENV.get('WEBGL_MAX_TEXTURE_SIZE');
+    if (convInfo.dilationHeight === 1 && convInfo.dilationWidth === 1 &&
+        // Output texture shape must be [NHW, C], which means N*H*W <=
+        // maxTexSize
+        convInfo.batchSize * convInfo.outHeight * convInfo.outWidth <=
+            maxTexSize &&
+        // outWidth should be divisible by localGroupSize[1]
+        convInfo.outWidth % 7 === 0 /* To be optimized */) {
       const program = new Conv2DProgramCS(convInfo);
       return this.compileAndRunCS(program, [x, filter]);
     }
