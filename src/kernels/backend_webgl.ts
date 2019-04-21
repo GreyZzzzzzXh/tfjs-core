@@ -65,6 +65,7 @@ import {Conv2DProgram, Conv3DProgram} from './webgl/conv_gpu';
 // import {Conv2DProgramCS} from './webgl/conv_gpu_cs';
 import {Conv2DProgramCS} from './webgl/conv_gpu_cs_v2';
 import {DepthwiseConv2DProgram} from './webgl/conv_gpu_depthwise';
+import {DepthwiseConv2DProgramCS} from './webgl/conv_gpu_depthwise_cs';
 import {DepthwiseConvPacked2DProgram} from './webgl/conv_packed_gpu_depthwise';
 import {CropAndResizeProgram} from './webgl/crop_and_resize_gpu';
 import {CumSumProgram} from './webgl/cumsum_gpu';
@@ -1876,6 +1877,18 @@ export class MathBackendWebGL implements KernelBackend {
       return this.compileAndRunCS(
           program, [x, filter],
           this.makePackedTensor(convInfo.outShape, x.dtype));
+    }
+
+    const maxTexSize = ENV.get('WEBGL_MAX_TEXTURE_SIZE');
+    if (convInfo.dilationHeight === 1 && convInfo.dilationWidth === 1 &&
+        // Output texture shape must be [NHW, C], which means N*H*W <=
+        // maxTexSize
+        convInfo.batchSize * convInfo.outHeight * convInfo.outWidth <=
+            maxTexSize &&
+        // outWidth should be divisible by localGroupSize[1]
+        convInfo.outWidth % 7 === 0 /* To be optimized */) {
+      program = new DepthwiseConv2DProgramCS(convInfo);
+      return this.compileAndRunCS(program, [x, filter]);
     }
 
     program = new DepthwiseConv2DProgram(convInfo);
