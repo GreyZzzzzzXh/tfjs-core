@@ -46,13 +46,14 @@ export class DepthwiseConv2DProgramCS implements GPGPUProgram {
       const ivec2 strides = ivec2(${strideHeight}, ${strideWidth});
       const ivec2 pads = ivec2(${padTop}, ${padLeft});
 
-      const int cacheH = ${filterHeight};
-      const int cacheW = ${
+      const int CACHE_H = ${filterHeight};
+      const int CACHE_W = ${
         (this.localGroupSize[1] - 1) * strideWidth + filterWidth};
-      const int cacheC = ${this.localGroupSize[0] / channelMul};
-      const int cacheHW = cacheH * cacheW;
-      // Combine cacheW and cacheC
-      shared float cache[cacheH][cacheW * cacheC];
+      const int CACHE_C = ${this.localGroupSize[0] / channelMul};
+      const int CACHE_WC = CACHE_W * CACHE_C;
+      const int CACHE_HWC = CACHE_H * CACHE_W * CACHE_C;
+      // Combine CACHE_W and CACHE_C
+      shared float cache[CACHE_H][CACHE_W * CACHE_C];
 
       void main() {
         ivec4 coords = getFirstThreadOutputCoords();
@@ -62,33 +63,30 @@ export class DepthwiseConv2DProgramCS implements GPGPUProgram {
         int cacheCCorner = cacheRCCorner.y;
         int cacheDCorner = coords.w / ${channelMul};
 
-        // Fill cache
-        // TODO: Use all threads to fill cache
-        // BUG: Local group size may be less than cacheHW
+        // Fill cache using all threads in a local group
         int index = int(gl_LocalInvocationIndex);
-        if (index < cacheHW) {
-          int row = index / cacheW;
-          int col = imod(index, cacheW);
+        while (index < CACHE_HWC) {
+          int r = index / CACHE_WC;
+          int cd = index - r * CACHE_WC;
+          int c = cd / CACHE_C;
+          int d = cd - c * CACHE_C;
 
-          if ((cacheRCorner + row) >= 0 &&
-              (cacheCCorner + col) >= 0 &&
-              (cacheRCorner + row) < ${convInfo.inHeight} &&
-              (cacheCCorner + col) < ${convInfo.inWidth}) {
-            for (int i = 0; i < cacheC; i++) {
-              if (cacheDCorner + i >= ${convInfo.inChannels}) {
-                break;
-              }
-              cache[row][col * cacheC + i] =
-                  getX(batch, cacheRCorner + row,
-                       cacheCCorner + col, cacheDCorner + i);
-            }
+          if ((cacheRCorner + r) >= 0 &&
+              (cacheCCorner + c) >= 0 &&
+              (cacheRCorner + r) < ${convInfo.inHeight} &&
+              (cacheCCorner + c) < ${convInfo.inWidth} &&
+              (cacheDCorner + d) < ${convInfo.inChannels}) {
+            cache[r][cd] =
+              getX(batch, cacheRCorner + r, cacheCCorner + c, cacheDCorner + d);
           }
+
+          index += ${this.localGroupSize[0] * this.localGroupSize[1]};
         }
 
         memoryBarrierShared();
         barrier();
 
-        // Discard threads that are out of bounds
+        // Discard threads that are out of X bounds
         if (int(gl_GlobalInvocationID.x) >= ${convInfo.outChannels}) {
           return;
         }
@@ -117,7 +115,7 @@ export class DepthwiseConv2DProgramCS implements GPGPUProgram {
             if (xC < 0 || xC >= ${xNumCols}) {
               continue;
             }
-            int sC = (xC - cacheCCorner) * cacheC;
+            int sC = (xC - cacheCCorner) * CACHE_C;
 
             float xVal = cache[sR][sC + d1 - cacheDCorner];
             float wVal = getW(wR, wC, d1, q);
