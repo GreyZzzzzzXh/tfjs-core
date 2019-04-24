@@ -86,6 +86,15 @@ module.exports = function(config) {
         os_version: '11.0',
         real_mobile: true
       },
+      // yarn test --browsers=chrome_webgl2_compute --backend=webgl --features '{\"WEBGL_PACK\": false}' --grep='conv2d'
+      chrome_webgl2_compute: {
+        base: 'ChromeCanary',
+        flags: [
+          '--use-cmd-decoder=passthrough',
+          '--enable-webgl2-compute-context',
+          '--use-angle=d3d11'
+        ]
+      },
       chrome_with_swift_shader: {
         base: 'Chrome',
         flags: ['--blacklist-accelerated-compositing', '--blacklist-webgl']
