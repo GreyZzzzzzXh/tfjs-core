@@ -1842,13 +1842,12 @@ export class MathBackendWebGL implements KernelBackend {
     }
 
     const maxTexSize = ENV.get('WEBGL_MAX_TEXTURE_SIZE');
-    if (convInfo.dilationHeight === 1 && convInfo.dilationWidth === 1 &&
-        // Output texture shape must be [NHW, C], which means N*H*W <=
-        // maxTexSize
-        convInfo.batchSize * convInfo.outHeight * convInfo.outWidth <=
+    // Limitations:
+    // 1. Output texture shape must be [NHW, C], which means N*H*W <= maxTexSize
+    // 2. OutWidth should be divisible by localGroupSize[1]. (To be optimized)
+    if (convInfo.batchSize * convInfo.outHeight * convInfo.outWidth <=
             maxTexSize &&
-        // outWidth should be divisible by localGroupSize[1]
-        convInfo.outWidth % 7 === 0 /* To be optimized */) {
+        convInfo.outWidth % 7 === 0) {
       const program = new Conv2DProgramCS(convInfo);
       return this.compileAndRunCS(program, [x, filter]);
     }
