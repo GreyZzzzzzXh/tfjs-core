@@ -32,8 +32,7 @@ export class DepthwiseConv2DProgramCS implements GPGPUProgram {
     const padLeft = convInfo.padInfo.left;
     const strideHeight = convInfo.strideHeight;
     const strideWidth = convInfo.strideWidth;
-    const dilationHeight =
-        convInfo.dilationHeight;  // dilationHeight/Width should be 1
+    const dilationHeight = convInfo.dilationHeight;
     const dilationWidth = convInfo.dilationWidth;
     const filterHeight = convInfo.filterHeight;
     const filterWidth = convInfo.filterWidth;
@@ -48,7 +47,8 @@ export class DepthwiseConv2DProgramCS implements GPGPUProgram {
 
       const int CACHE_H = ${filterHeight};
       const int CACHE_W = ${
-        (this.localGroupSize[1] - 1) * strideWidth + filterWidth};
+        (this.localGroupSize[1] - 1) * strideWidth + filterWidth +
+        (filterWidth - 1) * (dilationWidth - 1)};
       const int CACHE_C = ${this.localGroupSize[0] / channelMul};
       const int CACHE_WC = CACHE_W * CACHE_C;
       const int CACHE_HWC = CACHE_H * CACHE_W * CACHE_C;
@@ -76,8 +76,8 @@ export class DepthwiseConv2DProgramCS implements GPGPUProgram {
               (cacheRCorner + r) < ${convInfo.inHeight} &&
               (cacheCCorner + c) < ${convInfo.inWidth} &&
               (cacheDCorner + d) < ${convInfo.inChannels}) {
-            cache[r][cd] =
-              getX(batch, cacheRCorner + r, cacheCCorner + c, cacheDCorner + d);
+            cache[r][cd] = getX(batch, cacheRCorner + r * ${dilationHeight},
+                                cacheCCorner + c, cacheDCorner + d);
           }
 
           index += ${this.localGroupSize[0] * this.localGroupSize[1]};
@@ -102,9 +102,9 @@ export class DepthwiseConv2DProgramCS implements GPGPUProgram {
         // Convolve x(?, ?, d1) with w(:, :, d1, q) to get y(yR, yC, d2).
         // ? = to be determined. : = across all values in that axis.
         float dotProd = 0.0;
-        // TODO(dsmilkov): Flatten the two for loops and vec4 the operations.
+        // TODO: Flatten the two for loops and vec4 the operations.
         for (int wR = 0; wR < ${filterHeight}; wR++) {
-          int xR = xRCorner + wR * ${dilationHeight};
+          int xR = xRCorner + wR;
           if (xR < 0 || xR >= ${xNumRows}) {
             continue;
           }

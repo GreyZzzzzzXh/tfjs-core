@@ -1841,10 +1841,13 @@ export class MathBackendWebGL implements KernelBackend {
       return this.conv2dWithIm2Row(x, filter, convInfo);
     }
 
-    const maxTexSize = ENV.get('WEBGL_MAX_TEXTURE_SIZE');
     // Limitations:
     // 1. Output texture shape must be [NHW, C], which means N*H*W <= maxTexSize
-    // 2. OutWidth should be divisible by localGroupSize[1]. (To be optimized)
+    // 2. OutWidth should be divisible by localGroupSize[1]
+    // TODO:
+    // 1. Use Conv2DProgram if tensor size is not large enough
+    // 2. Output texture shape can be [N, HWC]
+    const maxTexSize = ENV.get('WEBGL_MAX_TEXTURE_SIZE');
     if (convInfo.batchSize * convInfo.outHeight * convInfo.outWidth <=
             maxTexSize &&
         convInfo.outWidth % 7 === 0) {
@@ -1869,7 +1872,8 @@ export class MathBackendWebGL implements KernelBackend {
 
   depthwiseConv2D(x: Tensor4D, filter: Tensor4D, convInfo: Conv2DInfo):
       Tensor4D {
-    let program: DepthwiseConv2DProgram|DepthwiseConvPacked2DProgram;
+    let program: DepthwiseConv2DProgram|DepthwiseConvPacked2DProgram|
+        DepthwiseConv2DProgramCS;
     if (ENV.get('WEBGL_PACK_DEPTHWISECONV') && convInfo.strideWidth <= 2 &&
         convInfo.outChannels / convInfo.inChannels === 1) {
       program = new DepthwiseConvPacked2DProgram(convInfo);
@@ -1878,14 +1882,13 @@ export class MathBackendWebGL implements KernelBackend {
           this.makePackedTensor(convInfo.outShape, x.dtype));
     }
 
+    // Limitations:
+    // 1. Output texture shape must be [NHW, C], which means N*H*W <= maxTexSize
+    // 2. OutWidth should be divisible by localGroupSize[1]
     const maxTexSize = ENV.get('WEBGL_MAX_TEXTURE_SIZE');
-    if (convInfo.dilationHeight === 1 && convInfo.dilationWidth === 1 &&
-        // Output texture shape must be [NHW, C], which means N*H*W <=
-        // maxTexSize
-        convInfo.batchSize * convInfo.outHeight * convInfo.outWidth <=
+    if (convInfo.batchSize * convInfo.outHeight * convInfo.outWidth <=
             maxTexSize &&
-        // outWidth should be divisible by localGroupSize[1]
-        convInfo.outWidth % 7 === 0 /* To be optimized */) {
+        convInfo.outWidth % 7 === 0) {
       program = new DepthwiseConv2DProgramCS(convInfo);
       return this.compileAndRunCS(program, [x, filter]);
     }
