@@ -38,8 +38,15 @@ export class Conv2DProgramCS implements GPGPUProgram {
     const inputDepthNearestVec4 = Math.floor(convInfo.inChannels / 4) * 4;
     const inputDepthVec4Remainder = convInfo.inChannels % 4;
 
-    this.localGroupSize = [8, 7];
+    if (convInfo.outWidth <= 16) {
+      this.localGroupSize[1] = convInfo.outWidth;
+    }
+
     // outWidth should be divisible by localGroupSize[1]
+    // for 224-input model, e.g. mobilenet
+    this.localGroupSize = [8, 7];
+
+
 
     this.userCode = `
       const ivec2 strides = ivec2(${strideHeight}, ${strideWidth});

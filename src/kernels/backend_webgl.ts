@@ -1830,24 +1830,24 @@ export class MathBackendWebGL implements KernelBackend {
   }
 
   conv2d(x: Tensor4D, filter: Tensor4D, convInfo: Conv2DInfo): Tensor4D {
-    if (convInfo.filterHeight === 1 && convInfo.filterWidth === 1 &&
-        convInfo.dilationHeight === 1 && convInfo.dilationWidth === 1 &&
-        convInfo.strideHeight === 1 && convInfo.strideWidth === 1 &&
-        (convInfo.padInfo.type === 'SAME' ||
-         convInfo.padInfo.type === 'VALID')) {
-      return this.conv2dByMatMul(x, filter, convInfo);
-    }
-    if (ENV.get('WEBGL_CONV_IM2COL') && x.shape[0] === 1) {
-      return this.conv2dWithIm2Row(x, filter, convInfo);
-    }
+    // if (convInfo.filterHeight === 1 && convInfo.filterWidth === 1 &&
+    //     convInfo.dilationHeight === 1 && convInfo.dilationWidth === 1 &&
+    //     convInfo.strideHeight === 1 && convInfo.strideWidth === 1 &&
+    //     (convInfo.padInfo.type === 'SAME' ||
+    //      convInfo.padInfo.type === 'VALID')) {
+    //   return this.conv2dByMatMul(x, filter, convInfo);
+    // }
+    // if (ENV.get('WEBGL_CONV_IM2COL') && x.shape[0] === 1) {
+    //   return this.conv2dWithIm2Row(x, filter, convInfo);
+    // }
 
     const maxTexSize = ENV.get('WEBGL_MAX_TEXTURE_SIZE');
-    // Limitations:
-    // 1. Output texture shape must be [NHW, C], which means N*H*W <= maxTexSize
-    // 2. OutWidth should be divisible by localGroupSize[1]. (To be optimized)
+    // Output texture shape must be [NHW, C], which means N*H*W <= maxTexSize
+    // TODO:
+    // 1. Use Conv2DProgram if tensor size is not large enough
+    // 2. Output texture shape can be [N, HWC]
     if (convInfo.batchSize * convInfo.outHeight * convInfo.outWidth <=
-            maxTexSize &&
-        convInfo.outWidth % 7 === 0) {
+        maxTexSize) {
       const program = new Conv2DProgramCS(convInfo);
       return this.compileAndRunCS(program, [x, filter]);
     }
