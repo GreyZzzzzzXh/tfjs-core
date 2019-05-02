@@ -1839,17 +1839,23 @@ export class MathBackendWebGL implements KernelBackend {
       return this.conv2dWithIm2Row(x, filter, convInfo);
     }
 
-    // Limitations:
-    // 1. Output texture shape must be [NHW, C], which means N*H*W <= maxTexSize
-    // 2. OutWidth should be divisible by localGroupSize[1]
+    // Output texture shape must be [NHW, C] or [1H, WC](N=1).
+    //  [NHW, C]: outWidth must be divisible by localGroupSize[1]
+    //  [1H, WC]: outChannels must be divisible by localGroupSize[0]
     // TODO:
-    // 1. Use Conv2DProgram if tensor size is not large enough
-    // 2. Output texture shape can be [N, HWC]
+    //  Set localGroupSize automatically.
+    //  Use Conv2DProgram if tensor size is not large enough.
     const maxTexSize = ENV.get('WEBGL_MAX_TEXTURE_SIZE');
     if (convInfo.batchSize * convInfo.outHeight * convInfo.outWidth <=
             maxTexSize &&
-        convInfo.outWidth % 7 === 0) {
-      const program = new Conv2DProgramCS(convInfo);
+        convInfo.outChannels <= maxTexSize && convInfo.outWidth % 7 === 0) {
+      const program = new Conv2DProgramCS(convInfo, 'NHW_C');
+      return this.compileAndRunCS(program, [x, filter]);
+    } else if (
+        convInfo.batchSize === 1 && convInfo.outHeight <= maxTexSize &&
+        convInfo.outWidth * convInfo.outChannels <= maxTexSize &&
+        convInfo.outChannels % 8 === 0) {
+      const program = new Conv2DProgramCS(convInfo, '1H_WC');
       return this.compileAndRunCS(program, [x, filter]);
     }
 
