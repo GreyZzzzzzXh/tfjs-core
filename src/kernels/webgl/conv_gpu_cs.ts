@@ -99,11 +99,11 @@ export class Conv2DProgramCS implements GPGPUProgram {
           // ? = to be determined. : = across all values in that axis.
           float dotProd = 0.0;
           for (int wR = 0; wR < ${filterHeight}; wR++) {
-            int xR = xRCorner + wR;
+            int xR = xRCorner + wR * ${dilationHeight};
             if (xR < 0 || xR >= ${convInfo.inHeight}) {
               continue;
             }
-            int sR = xR - cacheRCorner;
+            int sR = wR;
 
             for (int wC = 0; wC < ${filterWidth}; wC++) {
               int xC = xCCorner + wC * ${dilationWidth};
@@ -227,11 +227,11 @@ export class Conv2DProgramCS implements GPGPUProgram {
             int sR = xR - cacheRCorner;
 
             for (int wC = 0; wC < ${filterWidth}; wC++) {
-              int xC = xCCorner + wC;
+              int xC = xCCorner + wC * ${dilationWidth};
               if (xC < 0 || xC >= ${convInfo.inWidth}) {
                 continue;
               }
-              int sC = (xC - cacheCCorner) * CACHE_C;
+              int sC = wC * CACHE_C;
 
               for (int d1 = 0; d1 < ${inputDepthNearestVec4}; d1 += 4) {
                 vec4 xValues = vec4(

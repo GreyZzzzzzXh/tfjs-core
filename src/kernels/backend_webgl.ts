@@ -1845,6 +1845,10 @@ export class MathBackendWebGL implements KernelBackend {
     // TODO:
     //  Set localGroupSize automatically.
     //  Use Conv2DProgram if tensor size is not large enough.
+    // BUG:
+    //  In fact, we can't get the output texture shape by following way. If the
+    //  logical shape contains 1, it will be squeezed.
+    //  See getTextureShapeFromLogicalShape(...)
     const maxTexSize = ENV.get('WEBGL_MAX_TEXTURE_SIZE');
     if (convInfo.batchSize * convInfo.outHeight * convInfo.outWidth <=
             maxTexSize &&
