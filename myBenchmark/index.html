@@ -34,6 +34,30 @@
     }
 
 
+    async function mm6Benchmark() {
+
+      tf.ENV.set('WEBGL_MATMUL_VERSION', 4);
+
+      const times = [];
+      const A = tf.randomNormal([N, N]);
+      const B = tf.randomNormal([N, N]);
+      let C = tf.matMul(A, B);
+      await C.data();
+      for (let i = 0; i < 100; i++) {
+        const start = performance.now();
+        let C = tf.matMul(A, B);
+        await C.data();
+        times.push(performance.now() - start);
+      }
+      const avgTime = times.reduce((a, b) => a + b, 0) / times.length;
+      const GFLOPS = N * N * N / avgTime / 1000000;
+
+      document.getElementById('mm6Output').innerText =
+          `Average time = ${avgTime.toFixed(2)} ms GFLOPS = ${GFLOPS.toFixed(2)}`;
+      showNumTensors();
+    }
+
+
     async function transposeBenchmark() {
 
       const times = [];
@@ -103,8 +127,19 @@
       </select>
 
 
+  <h1>Matrix multiplication Shader6 (Average 100)</h1>
+  <p> Versions <br> 4 - MatMulPackedProgramCSV4 - Shader6</p>
+  <p> TSM = 64, TSN = 64, TSK = 16;<br>
+      WPTM = 4, WPTN = 4;<br>
+      RTSM = 16, RTSN = 16;</p>
+  <p> No transpose...</p>
+  <p id="mm6Output"></p>
+  <input type="button" onclick="mm6Benchmark()" value="Run" size="1">
+
+
   <h1>Transpose benchmark (Average 100)</h1>
   <p>TS=32</p>
+  <p>Emmmm tf.transpose takes a lot of time..</p>
   <p id="transposeOutput"></p>
   <input type="button" onclick="transposeBenchmark()" value="Run" size="1">
 
