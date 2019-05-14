@@ -313,6 +313,7 @@ export class Environment {
       // 1: MatMulPackedProgramCS
       // 2: MatMulPackedProgramCSV2
       // 3: MatMulPackedProgramCSV3
+      // 4: MatMulPackedProgramCSV4
       return 1;
     } else if (feature === 'WEBGL_MATMUL_TS') {
       return 16;
