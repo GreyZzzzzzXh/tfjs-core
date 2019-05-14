@@ -30,6 +30,7 @@ export interface Features {
   'WEBGL_CPU_FORWARD'?: boolean;
   // 0: MatMulPackedProgram, 1: MatMulPackedProgramCS,
   // 2: MatMulPackedProgramCSV2, 3:MatMulPackedProgramCSV3
+  // 4: MatMulPackedProgramCSV4
   'WEBGL_MATMUL_VERSION'?: number;
   // Tile size in MatMulPackedProgramCS*
   'WEBGL_MATMUL_TS'?: number;
