@@ -75,7 +75,8 @@ export class MatMulPackedProgramCSV4 implements GPGPUProgram {
         int offsetM = ${TSM} * int(gl_WorkGroupID.y);
         int offsetN = ${TSN} * int(gl_WorkGroupID.x);
 
-        vec4 Breg[${WPTN}];
+        // vec4 Breg[${WPTN}];
+        vec4 Areg[${WPTM}];
         vec4 acc[${WPTM}][${WPTN}];
 
         for (int wm = 0; wm < ${WPTM}; wm++) {
@@ -106,16 +107,31 @@ export class MatMulPackedProgramCSV4 implements GPGPUProgram {
                         ${sharedDimensionPacked % TSK} != 0) ?
                         ${sharedDimensionPacked % TSK} : ${TSK};
           for (int k = 0; k < sizeTS; k++) {
-            for (int wn = 0; wn < ${WPTN}; wn++) {
-              int col = tidn + wn * ${RTSN};
-              Breg[wn] = Bsub[k][col];   //      if load A first  ???
+            // for (int wn = 0; wn < ${WPTN}; wn++) {
+            //   int col = tidn + wn * ${RTSN};
+            //   Breg[wn] = Bsub[k][col];   //      if load A first  ???
+            // }
+
+            // for (int wm = 0; wm < ${WPTM}; wm++) {
+            //   int row = tidm + wm * ${RTSM};
+            //   vec4 a = Asub[row][k];
+            //   for (int wn = 0; wn < ${WPTN}; wn++) {
+            //     vec4 b = Breg[wn];
+            //     acc[wm][wn] += (${aSwizzle[0]} * ${bSwizzle[0]}) +
+            //                    (${aSwizzle[1]} * ${bSwizzle[1]});
+            //   }
+            // }
+
+            for (int wm = 0; wm < ${WPTN}; wm++) {
+              int row = tidm + wm * ${RTSM};
+              Areg[wm] = Asub[row][k];   //      if load A first
             }
 
-            for (int wm = 0; wm < ${WPTM}; wm++) {
-              int row = tidm + wm * ${RTSM};
-              vec4 a = Asub[row][k];
-              for (int wn = 0; wn < ${WPTN}; wn++) {
-                vec4 b = Breg[wn];
+            for (int wn = 0; wn < ${WPTN}; wn++) {
+              int col = tidn + wn * ${RTSN};
+              vec4 b = Bsub[k][col];
+              for (int wm = 0; wm < ${WPTM}; wm++) {
+                vec4 a = Areg[wm];
                 acc[wm][wn] += (${aSwizzle[0]} * ${bSwizzle[0]}) +
                                (${aSwizzle[1]} * ${bSwizzle[1]});
               }
