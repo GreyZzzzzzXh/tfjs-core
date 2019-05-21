@@ -1,0 +1,176 @@
+<html>
+<head>
+
+  <title>benchmark</title>
+  <script src="../dist/tf-core.js"></script>
+  <script type="text/javascript">
+
+
+    var N = 1024, version = 1, TS = 16, WPT = 1;
+
+    async function matMulBenchmark() {
+
+      console.log(N, version, TS, WPT);
+
+      tf.ENV.set('WEBGL_MATMUL_VERSION', version);
+      tf.ENV.set('WEBGL_MATMUL_TS', TS);
+      tf.ENV.set('WEBGL_MATMUL_WPT', WPT);
+
+      const times = [];
+      const A = tf.randomNormal([N, N]);
+      const B = tf.randomNormal([N, N]);
+      let C = tf.matMul(A, B);
+      await C.data();
+      for (let i = 0; i < 100; i++) {
+        const start = performance.now();
+        let C = tf.matMul(A, B);
+        await C.data();
+        times.push(performance.now() - start);
+      }
+      const avgTime = times.reduce((a, b) => a + b, 0) / times.length;
+      const GFLOPS = N * N * N / avgTime / 1000000;
+
+      document.getElementById('matmulOutput').innerText =
+          `Average time = ${avgTime.toFixed(2)} ms GFLOPS = ${GFLOPS.toFixed(2)}`;
+      showNumTensors();
+    }
+
+
+    var N_ = 1024, TSMN = 32, TSK = 16, WPTMN = 4;
+
+    async function mm6Benchmark() {
+
+      console.log(N_, TSMN, TSK, WPTMN);
+
+      tf.ENV.set('WEBGL_MATMUL_VERSION', 4 /* version */);
+      tf.ENV.set('WEBGL_MATMUL_TS', TSMN);
+      tf.ENV.set('WEBGL_MATMUL_TSK', TSK);
+      tf.ENV.set('WEBGL_MATMUL_WPT', WPTMN);
+
+      const times = [];
+      const A = tf.randomNormal([N_, N_]);
+      const B = tf.randomNormal([N_, N_]);
+      let C = tf.matMul(A, B);
+      await C.data();
+      for (let i = 0; i < 100; i++) {
+        const start = performance.now();
+        let C = tf.matMul(A, B);
+        await C.data();
+        times.push(performance.now() - start);
+      }
+      const avgTime = times.reduce((a, b) => a + b, 0) / times.length;
+      const GFLOPS = N_ * N_ * N_ / avgTime / 1000000;
+
+      document.getElementById('mm6Output').innerText =
+          `Average time = ${avgTime.toFixed(2)} ms GFLOPS = ${GFLOPS.toFixed(2)}`;
+      showNumTensors();
+    }
+
+
+    async function transposeBenchmark() {
+
+      const times = [];
+      const A = tf.randomNormal([1024, 1024]);
+      let C = tf.transpose(A);
+      await C.data();
+      for (let i = 0; i < 100; i++) {
+        const start = performance.now();
+        let C = tf.transpose(A);
+        await C.data();
+        times.push(performance.now() - start);
+      }
+      const avgTime = times.reduce((a, b) => a + b, 0) / times.length;
+
+      document.getElementById('transposeOutput').innerText =
+          `Average time = ${avgTime.toFixed(2)} ms`;
+      showNumTensors();
+    }
+
+
+    function showNumTensors() {
+      document.getElementById('numTensors').innerText =
+          'numTensors = ' + tf.memory().numTensors;
+    }
+
+
+  </script>
+
+  <style type="text/css">
+    h1{color: green}
+    h2{color: red}
+  </style>
+
+
+</head>
+<body>
+
+
+  <h1>Matrix multiplication benchmark (Average 100)</h1>
+  <p> Versions
+    <br>0 - MatMulPackedProgram - naive - TS=32
+    <br>1 - MatMulPackedProgramCS - shared memory
+    <br>2 - MatMulPackedProgramCSV2 - more work per thread
+    <br>3 - MatMulPackedProgramCSV3 - 2D register blocking (Something wrong?)
+  </p>
+  <p>TS: Tile size in MatMulPackedProgramCS*</p>
+  <p>WPT: Work per thread in MatMulPackedProgramCSV*</p>
+  <p id="matmulOutput"></p>
+  <input type="button" onclick="matMulBenchmark()" value="Run" size="1">
+  N=<input value="1024" size="3" onchange="N=parseInt(this.value)">
+  version=<select onchange="version=parseInt(this.options[this.selectedIndex].value)">
+          <option value="0">0
+          <option value="1" selected>1
+          <option value="2">2
+          <option value="3">3
+          </select>
+  TS=<select onchange="TS=parseInt(this.options[this.selectedIndex].value)">
+     <option value="8">8
+     <option value="16" selected>16
+     <option value="32">32
+     </select>
+  WPT=<select onchange="WPT=parseInt(this.options[this.selectedIndex].value)">
+      <option value="1" selected>1
+      <option value="2">2
+      <option value="4">4
+      <option value="8">8
+      </select>
+
+
+  <h1>Matrix multiplication Shader6 (Average 100)</h1>
+  <p> Versions <br> 4 - MatMulPackedProgramCSV4 - Shader6</p>
+  <p> Rectangular tiles - No transpose</p>
+  <p id="mm6Output"></p>
+  <input type="button" onclick="mm6Benchmark()" value="Run" size="1">
+  N=<input value="1024" size="3" onchange="N_=parseInt(this.value)">
+  TSM/N=<select onchange="TSMN=parseInt(this.options[this.selectedIndex].value)">
+        <option value="4">4
+        <option value="8">8
+        <option value="16">16
+        <option value="32" selected>32
+        <option value="64">64
+        </select>
+  TSK=<select onchange="TSK=parseInt(this.options[this.selectedIndex].value)">
+      <option value="4">4
+      <option value="8">8
+      <option value="16" selected>16
+      </select>
+  WPTM/N=<select onchange="WPTMN=parseInt(this.options[this.selectedIndex].value)">
+         <option value="2">2
+         <option value="4" selected>4
+         <option value="8">8
+         </select>
+
+
+  <!-- <h1>Transpose benchmark (Average 100)</h1>
+  <p>N=1024 TS=32</p>
+  <p>Emmmm tf.transpose takes a lot of time..</p>
+  <p id="transposeOutput"></p>
+  <input type="button" onclick="transposeBenchmark()" value="Run" size="1"> -->
+
+
+  <h2>Remember to F5 frequently because of memory leak</h2>
+  <p id="numTensors"></p>
+
+
+</body>
+</html>
