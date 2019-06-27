@@ -146,6 +146,40 @@ function createAndConfigureTexture(
       () => gl.texParameteri(tex2d, gl.TEXTURE_MAG_FILTER, gl.NEAREST));
   webgl_util.callAndCheck(
       gl, debug,
+      // tslint:disable-next-line:no-any
+      () => (gl as any).texStorage2D(tex2d, 1, internalFormat, width, height));
+  // webgl_util.callAndCheck(
+  //     gl, debug,
+  //     () => gl.texImage2D(
+  //         tex2d, 0, internalFormat, width, height, 0, textureFormat,
+  //         textureType, null));
+  webgl_util.callAndCheck(gl, debug, () => gl.bindTexture(gl.TEXTURE_2D, null));
+  return texture;
+}
+
+function createAndConfigureUnsignedBytesTexture(
+    gl: WebGLRenderingContext, debug: boolean, width: number, height: number,
+    internalFormat: number, textureFormat: number,
+    textureType: number): WebGLTexture {
+  webgl_util.validateTextureSize(width, height);
+  const texture = webgl_util.createTexture(gl, debug);
+
+  const tex2d = gl.TEXTURE_2D;
+  webgl_util.callAndCheck(gl, debug, () => gl.bindTexture(tex2d, texture));
+  webgl_util.callAndCheck(
+      gl, debug,
+      () => gl.texParameteri(tex2d, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE));
+  webgl_util.callAndCheck(
+      gl, debug,
+      () => gl.texParameteri(tex2d, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE));
+  webgl_util.callAndCheck(
+      gl, debug,
+      () => gl.texParameteri(tex2d, gl.TEXTURE_MIN_FILTER, gl.NEAREST));
+  webgl_util.callAndCheck(
+      gl, debug,
+      () => gl.texParameteri(tex2d, gl.TEXTURE_MAG_FILTER, gl.NEAREST));
+  webgl_util.callAndCheck(
+      gl, debug,
       () => gl.texImage2D(
           tex2d, 0, internalFormat, width, height, 0, textureFormat,
           textureType, null));
@@ -178,7 +212,7 @@ export function createUnsignedBytesMatrixTexture(
     textureConfig: TextureConfig): WebGLTexture {
   const [width, height] =
       tex_util.getUnpackedMatrixTextureShapeWidthHeight(rows, columns);
-  return createAndConfigureTexture(
+  return createAndConfigureUnsignedBytesTexture(
       gl, debug, width, height, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE);
 }
 

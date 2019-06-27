@@ -93,6 +93,7 @@ import {GPGPUContext} from './gpgpu_context';
 import * as gpgpu_math from './gpgpu_math';
 import {GPGPUBinary, GPGPUProgram, TensorData} from './gpgpu_math';
 import {Im2ColPackedProgram} from './im2col_packed_gpu';
+import {Im2ColPackedProgramCS} from './im2col_packed_gpu_cs';
 import {LRNProgram} from './lrn_gpu';
 import {LRNGradProgram} from './lrn_grad_gpu';
 import {LRNPackedProgram} from './lrn_packed_gpu';
@@ -1905,10 +1906,11 @@ export class MathBackendWebGL implements KernelBackend {
     const xSqueezed = x.squeeze([0]);
     const w2Row = filter.reshape([1, sharedDim, -1]) as Tensor3D;
 
-    const im2ColProgram =
-        new Im2ColPackedProgram(x2ColShape, xSqueezed.shape, convInfo);
+    let im2ColProgram: Im2ColPackedProgram|Im2ColPackedProgramCS;
+    im2ColProgram =
+        new Im2ColPackedProgramCS(x2ColShape, xSqueezed.shape, convInfo);
     const im2Col =
-        this.compileAndRun<Tensor2D>(im2ColProgram, [xSqueezed]).reshape([
+        this.compileAndRunCS<Tensor2D>(im2ColProgram, [xSqueezed]).reshape([
           1, x2ColShape[0], x2ColShape[1]
         ]) as Tensor3D;
 
@@ -2451,6 +2453,124 @@ export class MathBackendWebGL implements KernelBackend {
     }
 
     gpgpu_math.runProgram(
+        this.gpgpu, binary, inputsData, outputData, customSetup);
+
+    if (shouldTimeProgram) {
+      query = this.endTimer(query);
+      this.activeTimers.push(
+          {name: program.constructor.name, query: this.getQueryTime(query)});
+    }
+
+    if (!ENV.getBool('WEBGL_LAZILY_UNPACK') &&
+        this.texData.get(output.dataId).isPacked &&
+        preventEagerUnpackingOfOutput === false) {
+      return this.unpackTensor(output as {} as Tensor) as {} as K;
+    }
+    return output;
+  }
+
+  public compileAndRunCS<
+      K extends {dtype: DataType, size: number, dataId: {}, shape: number[]}>(
+      program: GPGPUProgram, inputs: TensorHandle[], output?: K,
+      customSetup?: (gpgpu: GPGPUContext, webGLProgram: WebGLProgram) => void,
+      preventEagerUnpackingOfOutput = false): K {
+    if (output == null) {
+      if (program.usesPackedTextures) {
+        output = this.makePackedTensor(program.outputShape, inputs[0].dtype) as
+            {} as K;
+      } else {
+        output = this.makeOutputArray(program.outputShape, inputs[0].dtype) as
+            {} as K;
+      }
+    }
+
+    if (output.size === 0) {
+      // Short-circuit the computation since the result is empty (has 0 in its
+      // shape).
+      this.texData.get(output.dataId).values =
+          getTypedArrayFromDType(output.dtype as 'float32', 0);
+      return output;
+    }
+
+    const inputsData: TensorData[] = inputs.map(input => {
+      if (input.dtype === 'complex64') {
+        throw new Error(
+            `GPGPUProgram does not support complex64 input. For complex64 ` +
+            `dtypes, please separate the program into real and imaginary ` +
+            `parts.`);
+      }
+
+      let texData = this.texData.get(input.dataId);
+
+      if (texData.texture == null) {
+        if (!program.usesPackedTextures &&
+            util.sizeFromShape(input.shape) <=
+                ENV.getNumber('WEBGL_SIZE_UPLOAD_UNIFORM')) {
+          // Upload small tensors that live on the CPU as uniforms, not as
+          // textures. Do this only when the environment supports 32bit floats
+          // due to problems when comparing 16bit floats with 32bit floats.
+          // TODO(https://github.com/tensorflow/tfjs/issues/821): Make it
+          // possible for packed shaders to sample from uniforms.
+          return {
+            shape: input.shape,
+            texData: null,
+            isUniform: true,
+            uniformValues: texData.values as TypedArray
+          };
+        }
+
+        // This ensures that if a packed program's inputs have not yet been
+        // uploaded to the GPU, they get uploaded as packed right off the bat.
+        if (program.usesPackedTextures) {
+          texData.isPacked = true;
+          texData.shape = input.shape;
+        }
+      } else if (!!texData.isPacked !== !!program.usesPackedTextures) {
+        input = texData.isPacked ? this.unpackTensor(input) :
+                                   this.packTensor(input);
+        texData = this.texData.get(input.dataId);
+      } else if (
+          texData.isPacked &&
+          !webgl_util.isReshapeFree(texData.shape, input.shape)) {
+        // This is a special case where a texture exists for a tensor
+        // but the shapes are incompatible (due to packing constraints) because
+        // the tensor did not have a chance to go through the packed reshape
+        // shader. This only happens when we reshape the *same* tensor to form
+        // *distinct* inputs to an op, e.g. dotting a vector with itself. This
+        // case will disappear once packed uploading is the default.
+
+        const savedInput = input;
+        const targetShape = input.shape;
+
+        input.shape = texData.shape;
+        input = this.packedReshape(input as Tensor, targetShape);
+        texData = this.texData.get(input.dataId);
+
+        savedInput.shape = targetShape;
+      }
+
+      this.uploadToGPU(input.dataId);
+      return {shape: input.shape, texData, isUniform: false};
+    });
+
+    this.uploadToGPU(output.dataId);
+    const outputData: TensorData = {
+      shape: output.shape,
+      texData: this.texData.get(output.dataId),
+      isUniform: false
+    };
+    const key = gpgpu_math.makeShaderKey(program, inputsData, outputData);
+    const binary = this.getAndSaveBinary(key, () => {
+      return gpgpu_math.compileCSProgram(
+          this.gpgpu, program, inputsData, outputData);
+    });
+    const shouldTimeProgram = this.activeTimers != null;
+    let query: WebGLQuery|CPUTimerQuery;
+    if (shouldTimeProgram) {
+      query = this.startTimer();
+    }
+
+    gpgpu_math.runCSProgram(
         this.gpgpu, binary, inputsData, outputData, customSetup);
 
     if (shouldTimeProgram) {

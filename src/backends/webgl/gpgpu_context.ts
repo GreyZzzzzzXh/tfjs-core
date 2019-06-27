@@ -258,6 +258,7 @@ export class GPGPUContext {
   }
 
   private vertexAttrsAreBound = false;
+  private firstProgram = true;
 
   public createProgram(fragmentShaderSource: string): WebGLProgram {
     this.throwIfDisposed();
@@ -282,6 +283,28 @@ export class GPGPUContext {
       this.setProgram(program);
       this.vertexAttrsAreBound = gpgpu_util.bindVertexProgramAttributeStreams(
           gl, this.debug, this.program, this.vertexBuffer);
+    }
+    return program;
+  }
+
+  public createCSProgram(computeShaderSource: string): WebGLProgram {
+    this.throwIfDisposed();
+    const gl = this.gl;
+    const computeShader: WebGLShader =
+        webgl_util.createComputeShader(gl, this.debug, computeShaderSource);
+    const program: WebGLProgram = webgl_util.createProgram(
+        gl,
+        this.debug,
+    );
+    webgl_util.callAndCheck(
+        gl, this.debug, () => gl.attachShader(program, computeShader));
+    webgl_util.linkProgram(gl, this.debug, program);
+    if (this.debug) {
+      webgl_util.validateProgram(gl, this.debug, program);
+    }
+    if (this.firstProgram) {
+      this.firstProgram = false;
+      this.setProgram(program);
     }
     return program;
   }
@@ -349,12 +372,26 @@ export class GPGPUContext {
     this.setOutputMatrixTextureDriver(outputMatrixTexture, columns, rows);
   }
 
+  public setOutputMatrixTextureCS(
+      outputMatrixTexture: WebGLTexture, rows: number, columns: number) {
+    this.setOutputMatrixTextureDriverCS(outputMatrixTexture, columns, rows);
+  }
+
   public setOutputPackedMatrixTexture(
       outputPackedMatrixTexture: WebGLTexture, rows: number, columns: number) {
     this.throwIfDisposed();
     const [width, height] =
         tex_util.getPackedMatrixTextureShapeWidthHeight(rows, columns);
     this.setOutputMatrixTextureDriver(outputPackedMatrixTexture, width, height);
+  }
+
+  public setOutputPackedMatrixTextureCS(
+      outputPackedMatrixTexture: WebGLTexture, rows: number, columns: number) {
+    this.throwIfDisposed();
+    const [width, height] =
+        tex_util.getPackedMatrixTextureShapeWidthHeight(rows, columns);
+    this.setOutputPackedMatrixTextureDriverCS(
+        outputPackedMatrixTexture, width, height);
   }
 
   public setOutputMatrixWriteRegion(
@@ -387,6 +424,25 @@ export class GPGPUContext {
     webgl_util.callAndCheck(
         gl, this.debug,
         () => gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0));
+  }
+
+  public executeCSProgram(numGroupX: number, numGroupY: number) {
+    this.throwIfDisposed();
+    this.throwIfNoProgram();
+    const gl = this.gl;
+    if (this.debug) {
+      this.debugValidate();
+    }
+    webgl_util.callAndCheck(
+        gl, this.debug,
+        // tslint:disable-next-line:no-any
+        () => (gl as any).dispatchCompute(numGroupX, numGroupY, 1));
+    // tslint:disable-next-line:no-any
+    (gl as any).memoryBarrier(
+        // tslint:disable-next-line:no-any
+        (gl as any).TEXTURE_UPDATE_BARRIER_BIT |
+        // tslint:disable-next-line:no-any
+        (gl as any).FRAMEBUFFER_BARRIER_BIT);
   }
 
   public blockUntilAllProgramsCompleted() {
@@ -587,6 +643,23 @@ export class GPGPUContext {
         gl, this.debug, () => gl.viewport(0, 0, width, height));
     webgl_util.callAndCheck(
         gl, this.debug, () => gl.scissor(0, 0, width, height));
+  }
+
+  private setOutputMatrixTextureDriverCS(
+      outputMatrixTexture: WebGLTexture, width: number, height: number) {
+    this.throwIfDisposed();
+    const gl = this.gl;
+    webgl_util.bindColorImageTexture(gl, this.debug, outputMatrixTexture);
+    this.outputTexture = outputMatrixTexture;
+  }
+
+  private setOutputPackedMatrixTextureDriverCS(
+      outputPackedMatrixTexture: WebGLTexture, width: number, height: number) {
+    this.throwIfDisposed();
+    const gl = this.gl;
+    webgl_util.bindPackedImageTexture(
+        gl, this.debug, outputPackedMatrixTexture);
+    this.outputTexture = outputPackedMatrixTexture;
   }
 
   private setOutputMatrixWriteRegionDriver(

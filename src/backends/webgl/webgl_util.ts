@@ -109,6 +109,24 @@ export function createFragmentShader(
   return fragmentShader;
 }
 
+export function createComputeShader(
+    gl: WebGLRenderingContext, debug: boolean,
+    computeShaderSource: string): WebGLShader {
+  const computeShader: WebGLShader = throwIfNull<WebGLShader>(
+      // tslint:disable-next-line:no-any
+      gl, debug, () => gl.createShader((gl as any).COMPUTE_SHADER),
+      'Unable to create compute WebGLShader.');
+  callAndCheck(
+      gl, debug, () => gl.shaderSource(computeShader, computeShaderSource));
+  callAndCheck(gl, debug, () => gl.compileShader(computeShader));
+  if (gl.getShaderParameter(computeShader, gl.COMPILE_STATUS) === false) {
+    logShaderSourceAndInfoLog(
+        computeShaderSource, gl.getShaderInfoLog(computeShader));
+    throw new Error('Failed to compile compute shader.');
+  }
+  return computeShader;
+}
+
 const lineNumberRegex = /ERROR: [0-9]+:([0-9]+):/g;
 function logShaderSourceAndInfoLog(
     shaderSource: string, shaderInfoLog: string) {
@@ -301,6 +319,30 @@ export function bindColorTextureToFramebuffer(
       gl, debug,
       () => gl.framebufferTexture2D(
           gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0));
+}
+
+export function bindColorImageTexture(
+    gl: WebGLRenderingContext, debug: boolean, texture: WebGLTexture) {
+  callAndCheck(
+      gl, debug,
+      // tslint:disable-next-line:no-any
+      () => (gl as any).bindImageTexture(
+          // tslint:disable-next-line:no-any
+          4, texture, 0, (gl as any).FALSE,
+          // tslint:disable-next-line:no-any
+          0, (gl as any).WRITE_ONLY, (gl as any).R32F));
+}
+
+export function bindPackedImageTexture(
+    gl: WebGLRenderingContext, debug: boolean, texture: WebGLTexture) {
+  callAndCheck(
+      gl, debug,
+      // tslint:disable-next-line:no-any
+      () => (gl as any).bindImageTexture(
+          // tslint:disable-next-line:no-any
+          4, texture, 0, (gl as any).FALSE,
+          // tslint:disable-next-line:no-any
+          0, (gl as any).WRITE_ONLY, (gl as any).RGBA32F));
 }
 
 export function unbindColorTextureFromFramebuffer(
