@@ -22,6 +22,7 @@ import * as util from '../../util';
 export enum TextureUsage {
   RENDER,
   UPLOAD,
+  UPLOAD_TEMP,
   PIXELS,
   DOWNLOAD
 }
@@ -31,6 +32,7 @@ export enum PhysicalTextureType {
   UNPACKED_FLOAT32,
   PACKED_4X1_UNSIGNED_BYTE,
   PACKED_2X2_FLOAT32,
+  PACKED_2X2_FLOAT32_TEMP,
   PACKED_2X2_FLOAT16
 }
 

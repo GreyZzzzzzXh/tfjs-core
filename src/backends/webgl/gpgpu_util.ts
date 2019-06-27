@@ -125,8 +125,8 @@ export function getTextureConfig(
 
 function createAndConfigureTexture(
     gl: WebGLRenderingContext, debug: boolean, width: number, height: number,
-    internalFormat: number, textureFormat: number,
-    textureType: number): WebGLTexture {
+    internalFormat: number, textureFormat: number, textureType: number,
+    immutable = true): WebGLTexture {
   webgl_util.validateTextureSize(width, height);
   const texture = webgl_util.createTexture(gl, debug);
 
@@ -144,45 +144,20 @@ function createAndConfigureTexture(
   webgl_util.callAndCheck(
       gl, debug,
       () => gl.texParameteri(tex2d, gl.TEXTURE_MAG_FILTER, gl.NEAREST));
-  webgl_util.callAndCheck(
-      gl, debug,
-      // tslint:disable-next-line:no-any
-      () => (gl as any).texStorage2D(tex2d, 1, internalFormat, width, height));
-  // webgl_util.callAndCheck(
-  //     gl, debug,
-  //     () => gl.texImage2D(
-  //         tex2d, 0, internalFormat, width, height, 0, textureFormat,
-  //         textureType, null));
-  webgl_util.callAndCheck(gl, debug, () => gl.bindTexture(gl.TEXTURE_2D, null));
-  return texture;
-}
 
-function createAndConfigureUnsignedBytesTexture(
-    gl: WebGLRenderingContext, debug: boolean, width: number, height: number,
-    internalFormat: number, textureFormat: number,
-    textureType: number): WebGLTexture {
-  webgl_util.validateTextureSize(width, height);
-  const texture = webgl_util.createTexture(gl, debug);
-
-  const tex2d = gl.TEXTURE_2D;
-  webgl_util.callAndCheck(gl, debug, () => gl.bindTexture(tex2d, texture));
-  webgl_util.callAndCheck(
-      gl, debug,
-      () => gl.texParameteri(tex2d, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE));
-  webgl_util.callAndCheck(
-      gl, debug,
-      () => gl.texParameteri(tex2d, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE));
-  webgl_util.callAndCheck(
-      gl, debug,
-      () => gl.texParameteri(tex2d, gl.TEXTURE_MIN_FILTER, gl.NEAREST));
-  webgl_util.callAndCheck(
-      gl, debug,
-      () => gl.texParameteri(tex2d, gl.TEXTURE_MAG_FILTER, gl.NEAREST));
-  webgl_util.callAndCheck(
-      gl, debug,
-      () => gl.texImage2D(
-          tex2d, 0, internalFormat, width, height, 0, textureFormat,
-          textureType, null));
+  if (immutable) {
+    webgl_util.callAndCheck(
+        gl, debug,
+        () =>
+            // tslint:disable-next-line:no-any
+        (gl as any).texStorage2D(tex2d, 1, internalFormat, width, height));
+  } else {
+    webgl_util.callAndCheck(
+        gl, debug,
+        () => gl.texImage2D(
+            tex2d, 0, internalFormat, width, height, 0, textureFormat,
+            textureType, null));
+  }
   webgl_util.callAndCheck(gl, debug, () => gl.bindTexture(gl.TEXTURE_2D, null));
   return texture;
 }
@@ -212,18 +187,18 @@ export function createUnsignedBytesMatrixTexture(
     textureConfig: TextureConfig): WebGLTexture {
   const [width, height] =
       tex_util.getUnpackedMatrixTextureShapeWidthHeight(rows, columns);
-  return createAndConfigureUnsignedBytesTexture(
-      gl, debug, width, height, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE);
+  return createAndConfigureTexture(
+      gl, debug, width, height, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, false);
 }
 
 export function createPackedMatrixTexture(
     gl: WebGLRenderingContext, debug: boolean, rows: number, columns: number,
-    textureConfig: TextureConfig): WebGLTexture {
+    textureConfig: TextureConfig, immutable?: boolean): WebGLTexture {
   const [width, height] =
       tex_util.getPackedMatrixTextureShapeWidthHeight(rows, columns);
   return createAndConfigureTexture(
       gl, debug, width, height, textureConfig.internalFormatPackedFloat,
-      gl.RGBA, gl.FLOAT);
+      gl.RGBA, gl.FLOAT, immutable);
 }
 
 export function createFloat16PackedMatrixTexture(

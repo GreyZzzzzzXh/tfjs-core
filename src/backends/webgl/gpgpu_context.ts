@@ -160,11 +160,11 @@ export class GPGPUContext {
         this.gl, this.debug, rows, columns, this.textureConfig);
   }
 
-  public createPackedMatrixTexture(rows: number, columns: number):
-      WebGLTexture {
+  public createPackedMatrixTexture(
+      rows: number, columns: number, immutable?: boolean): WebGLTexture {
     this.throwIfDisposed();
     return gpgpu_util.createPackedMatrixTexture(
-        this.gl, this.debug, rows, columns, this.textureConfig);
+        this.gl, this.debug, rows, columns, this.textureConfig, immutable);
   }
 
   public deleteMatrixTexture(texture: WebGLTexture) {

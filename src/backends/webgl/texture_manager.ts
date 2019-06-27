@@ -54,7 +54,13 @@ export class TextureManager {
 
     let newTexture: WebGLTexture;
     if (physicalTexType === PhysicalTextureType.PACKED_2X2_FLOAT32) {
-      newTexture = this.gpgpu.createPackedMatrixTexture(shapeRC[0], shapeRC[1]);
+      newTexture =
+          this.gpgpu.createPackedMatrixTexture(shapeRC[0], shapeRC[1], true);
+    } else if (
+        physicalTexType === PhysicalTextureType.PACKED_2X2_FLOAT32_TEMP) {
+      // create texture by texImage2D
+      newTexture =
+          this.gpgpu.createPackedMatrixTexture(shapeRC[0], shapeRC[1], false);
     } else if (physicalTexType === PhysicalTextureType.PACKED_2X2_FLOAT16) {
       newTexture =
           this.gpgpu.createFloat16PackedMatrixTexture(shapeRC[0], shapeRC[1]);
@@ -146,6 +152,8 @@ function getPhysicalFromLogicalTextureType(
     logicalTexType: TextureUsage, isPacked: boolean): PhysicalTextureType {
   if (logicalTexType === TextureUsage.UPLOAD) {
     return PhysicalTextureType.PACKED_2X2_FLOAT32;
+  } else if (logicalTexType === TextureUsage.UPLOAD_TEMP) {
+    return PhysicalTextureType.PACKED_2X2_FLOAT32_TEMP;
   } else if (logicalTexType === TextureUsage.RENDER || logicalTexType == null) {
     if (isPacked) {
       return ENV.getBool('WEBGL_RENDER_FLOAT32_ENABLED') ?

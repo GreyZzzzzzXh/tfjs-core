@@ -2689,8 +2689,9 @@ export class MathBackendWebGL implements KernelBackend {
             TextureUsage.PIXELS;
       } else {
         this.texData.get(tempDenseInputHandle.dataId).usage =
-            TextureUsage.UPLOAD;
+            TextureUsage.UPLOAD_TEMP;
       }
+      // texture must be created by texImage2D
       this.gpgpu.uploadDenseMatrixToTexture(
           this.getTexture(tempDenseInputHandle.dataId), width, height,
           values as TypedArray);
