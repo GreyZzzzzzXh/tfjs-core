@@ -95,7 +95,6 @@ import {GPGPUContext} from './gpgpu_context';
 import * as gpgpu_math from './gpgpu_math';
 import {GPGPUBinary, GPGPUProgram, TensorData} from './gpgpu_math';
 import {Im2ColPackedProgram} from './im2col_packed_gpu';
-import {Im2ColPackedProgramCS} from './im2col_packed_gpu_cs';
 import {LRNProgram} from './lrn_gpu';
 import {LRNGradProgram} from './lrn_grad_gpu';
 import {LRNPackedProgram} from './lrn_packed_gpu';
@@ -1952,9 +1951,8 @@ export class MathBackendWebGL implements KernelBackend {
     const xSqueezed = x.squeeze([0]);
     const w2Row = filter.reshape([1, sharedDim, -1]) as Tensor3D;
 
-    let im2ColProgram: Im2ColPackedProgram|Im2ColPackedProgramCS;
-    im2ColProgram =
-        new Im2ColPackedProgramCS(x2ColShape, xSqueezed.shape, convInfo);
+    const im2ColProgram =
+        new Im2ColPackedProgram(x2ColShape, xSqueezed.shape, convInfo);
     const im2Col =
         this.compileAndRunCS<Tensor2D>(im2ColProgram, [xSqueezed]).reshape([
           1, x2ColShape[0], x2ColShape[1]

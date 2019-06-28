@@ -43,6 +43,7 @@ export class DecodeMatrixPackedProgram implements GPGPUProgram {
         // ivec2 resTexRC = ivec2(resultUV.yx *
         //   vec2(${texShape[0]}, ${texShape[1]}));
         ivec2 resTexRC = ivec2(gl_GlobalInvocationID.yx);
+
         int index = 4 * (resTexRC.x * ${texShape[1]} + resTexRC.y);
 
         vec4 result = vec4(0.);
