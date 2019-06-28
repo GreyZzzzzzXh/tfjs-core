@@ -100,10 +100,7 @@ import {LRNGradProgram} from './lrn_grad_gpu';
 import {LRNPackedProgram} from './lrn_packed_gpu';
 import {MaxPool2DBackpropProgram} from './max_pool_backprop_gpu';
 import {MatMulPackedProgram} from './mulmat_packed_gpu';
-import {MatMulPackedProgramCS} from './mulmat_packed_gpu_cs';
-import {MatMulPackedProgramCSV2} from './mulmat_packed_gpu_cs_v2';
-import {MatMulPackedProgramCSV3} from './mulmat_packed_gpu_cs_v3';
-import {MatMulPackedProgramCSV4} from './mulmat_packed_gpu_cs_v4';
+import {MatMulPackedProgramCSV1, MatMulPackedProgramCSV2, MatMulPackedProgramCSV3, MatMulPackedProgramCSV4} from './mulmat_packed_gpu_cs';
 import {MultinomialProgram} from './multinomial_gpu';
 import {OneHotProgram} from './onehot_gpu';
 import {PackProgram} from './pack_gpu';
@@ -851,7 +848,7 @@ export class MathBackendWebGL implements KernelBackend {
 
     const dtype = upcastType(a.dtype, b.dtype);
 
-    let program: MatMulPackedProgram|MatMulPackedProgramCS|
+    let program: MatMulPackedProgram|MatMulPackedProgramCSV1|
         MatMulPackedProgramCSV2|MatMulPackedProgramCSV3|MatMulPackedProgramCSV4;
 
     if (batch === 1) {
@@ -862,7 +859,7 @@ export class MathBackendWebGL implements KernelBackend {
               transposeB);
           break;
         case 1:
-          program = new MatMulPackedProgramCS(
+          program = new MatMulPackedProgramCSV1(
               a.shape, [batch, outerShapeA, outerShapeB], transposeA,
               transposeB, ENV.getNumber('WEBGL_MATMUL_TS'));
           break;
@@ -1958,7 +1955,7 @@ export class MathBackendWebGL implements KernelBackend {
           1, x2ColShape[0], x2ColShape[1]
         ]) as Tensor3D;
 
-    let matmulProgram: MatMulPackedProgram|MatMulPackedProgramCS|
+    let matmulProgram: MatMulPackedProgram|MatMulPackedProgramCSV1|
         MatMulPackedProgramCSV2|MatMulPackedProgramCSV3|MatMulPackedProgramCSV4;
 
     switch (ENV.getNumber('WEBGL_MATMUL_VERSION')) {
@@ -1967,7 +1964,7 @@ export class MathBackendWebGL implements KernelBackend {
             im2Col.shape, [1, numCols, convInfo.outChannels], true, false);
         break;
       case 1:
-        matmulProgram = new MatMulPackedProgramCS(
+        matmulProgram = new MatMulPackedProgramCSV1(
             im2Col.shape, [1, numCols, convInfo.outChannels], true, false,
             ENV.getNumber('WEBGL_MATMUL_TS'));
         break;

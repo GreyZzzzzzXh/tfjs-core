@@ -151,7 +151,7 @@ ENV.registerFlag('WEBGL_SIZE_UPLOAD_UNIFORM', () => {
 
 /**
  * 0: MatMulPackedProgram     - Naive implementation
- * 1: MatMulPackedProgramCS   - Tiling in the local memory
+ * 1: MatMulPackedProgramCSV1 - Tiling in the local memory
  * 2: MatMulPackedProgramCSV2 - More work per thread (square tiles)
  * 3: MatMulPackedProgramCSV3 - 2D register blocking (square tiles)
  * 4: MatMulPackedProgramCSV4 - 2D register blocking (rectangular tiles)
