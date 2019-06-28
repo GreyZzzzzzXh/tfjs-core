@@ -40,8 +40,9 @@ export class DecodeMatrixPackedProgram implements GPGPUProgram {
       }
 
       void main() {
-        ivec2 resTexRC = ivec2(resultUV.yx *
-          vec2(${texShape[0]}, ${texShape[1]}));
+        // ivec2 resTexRC = ivec2(resultUV.yx *
+        //   vec2(${texShape[0]}, ${texShape[1]}));
+        ivec2 resTexRC = ivec2(gl_GlobalInvocationID.yx);
         int index = 4 * (resTexRC.x * ${texShape[1]} + resTexRC.y);
 
         vec4 result = vec4(0.);
@@ -52,7 +53,8 @@ export class DecodeMatrixPackedProgram implements GPGPUProgram {
           result[i] = getChannel(getA(rc.x, rc.y, rc.z), vec2(rc.y, rc.z));
         }
 
-        ${glsl.output} = result;
+        // ${glsl.output} = result;
+        imageStore(${glsl.output}, ivec2(gl_GlobalInvocationID.xy), result);
       }
     `;
   }

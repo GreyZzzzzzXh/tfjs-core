@@ -1984,7 +1984,7 @@ function getSampler4DCS(inputInfo: InputInfo): string {
     return `
       float ${funcName}(int row, int col, int depth, int depth2) {
         int texR = row * ${shape[1] * shape[2]} + col * ${shape[2]} + depth;
-        fint texC = depth2;
+        int texC = depth2;
         ivec2 uv = ivec2(texC, texR);
         return sampleTexture(${texName}, uv);
       }
