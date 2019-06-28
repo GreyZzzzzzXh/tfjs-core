@@ -71,7 +71,9 @@ import {ConcatPackedProgram} from './concat_packed_gpu';
 import {Conv2DDerFilterProgram, Conv2DDerInputProgram, Conv3DDerFilterProgram, Conv3DDerInputProgram} from './conv_backprop_gpu';
 import {DepthwiseConv2DDerFilterProgram, DepthwiseConv2DDerInputProgram} from './conv_backprop_gpu_depthwise';
 import {Conv2DProgram, Conv3DProgram} from './conv_gpu';
+import {Conv2DProgramCS} from './conv_gpu_cs';
 import {DepthwiseConv2DProgram} from './conv_gpu_depthwise';
+import {DepthwiseConv2DProgramCS} from './conv_gpu_depthwise_cs';
 import {DepthwiseConvPacked2DProgram} from './conv_packed_gpu_depthwise';
 import {CropAndResizeProgram} from './crop_and_resize_gpu';
 import {CumSumProgram} from './cumsum_gpu';
@@ -99,6 +101,10 @@ import {LRNGradProgram} from './lrn_grad_gpu';
 import {LRNPackedProgram} from './lrn_packed_gpu';
 import {MaxPool2DBackpropProgram} from './max_pool_backprop_gpu';
 import {MatMulPackedProgram} from './mulmat_packed_gpu';
+import {MatMulPackedProgramCS} from './mulmat_packed_gpu_cs';
+import {MatMulPackedProgramCSV2} from './mulmat_packed_gpu_cs_v2';
+import {MatMulPackedProgramCSV3} from './mulmat_packed_gpu_cs_v3';
+import {MatMulPackedProgramCSV4} from './mulmat_packed_gpu_cs_v4';
 import {MultinomialProgram} from './multinomial_gpu';
 import {OneHotProgram} from './onehot_gpu';
 import {PackProgram} from './pack_gpu';
@@ -846,11 +852,51 @@ export class MathBackendWebGL implements KernelBackend {
 
     const dtype = upcastType(a.dtype, b.dtype);
 
-    const program = new MatMulPackedProgram(
-        a.shape, [batch, outerShapeA, outerShapeB], transposeA, transposeB);
+    let program: MatMulPackedProgram|MatMulPackedProgramCS|
+        MatMulPackedProgramCSV2|MatMulPackedProgramCSV3|MatMulPackedProgramCSV4;
+
+    if (batch === 1) {
+      switch (ENV.getNumber('WEBGL_MATMUL_VERSION')) {
+        case 0:
+          program = new MatMulPackedProgram(
+              a.shape, [batch, outerShapeA, outerShapeB], transposeA,
+              transposeB);
+          break;
+        case 1:
+          program = new MatMulPackedProgramCS(
+              a.shape, [batch, outerShapeA, outerShapeB], transposeA,
+              transposeB, ENV.getNumber('WEBGL_MATMUL_TS'));
+          break;
+        case 2:
+          program = new MatMulPackedProgramCSV2(
+              a.shape, [batch, outerShapeA, outerShapeB], transposeA,
+              transposeB, ENV.getNumber('WEBGL_MATMUL_TS'),
+              ENV.getNumber('WEBGL_MATMUL_WPT'));
+          break;
+        case 3:
+          program = new MatMulPackedProgramCSV3(
+              a.shape, [batch, outerShapeA, outerShapeB], transposeA,
+              transposeB, ENV.getNumber('WEBGL_MATMUL_TS'),
+              ENV.getNumber('WEBGL_MATMUL_WPT'));
+          break;
+        case 4:
+          program = new MatMulPackedProgramCSV4(
+              a.shape, [batch, outerShapeA, outerShapeB], transposeA,
+              transposeB, ENV.getNumber('WEBGL_MATMUL_TS'),
+              ENV.getNumber('WEBGL_MATMUL_TSK'),
+              ENV.getNumber('WEBGL_MATMUL_WPT'));
+          break;
+        default:
+          console.error('WEBGL_MATMUL_VERSION must be 0|1|2|3|4');
+      }
+    } else {
+      program = new MatMulPackedProgram(
+          a.shape, [batch, outerShapeA, outerShapeB], transposeA, transposeB);
+    }
+
     const output =
         this.makePackedTensor(program.outputShape, dtype) as Tensor3D;
-    return this.compileAndRun<Tensor3D>(program, [a, b], output);
+    return this.compileAndRunCS<Tensor3D>(program, [a, b], output);
   }
 
   fusedBatchMatMul(
@@ -1914,10 +1960,43 @@ export class MathBackendWebGL implements KernelBackend {
           1, x2ColShape[0], x2ColShape[1]
         ]) as Tensor3D;
 
-    const matmulProgram = new MatMulPackedProgram(
-        im2Col.shape, [1, numCols, convInfo.outChannels], true, false);
+    let matmulProgram: MatMulPackedProgram|MatMulPackedProgramCS|
+        MatMulPackedProgramCSV2|MatMulPackedProgramCSV3|MatMulPackedProgramCSV4;
+
+    switch (ENV.getNumber('WEBGL_MATMUL_VERSION')) {
+      case 0:
+        matmulProgram = new MatMulPackedProgram(
+            im2Col.shape, [1, numCols, convInfo.outChannels], true, false);
+        break;
+      case 1:
+        matmulProgram = new MatMulPackedProgramCS(
+            im2Col.shape, [1, numCols, convInfo.outChannels], true, false,
+            ENV.getNumber('WEBGL_MATMUL_TS'));
+        break;
+      case 2:
+        matmulProgram = new MatMulPackedProgramCSV2(
+            im2Col.shape, [1, numCols, convInfo.outChannels], true, false,
+            ENV.getNumber('WEBGL_MATMUL_TS'),
+            ENV.getNumber('WEBGL_MATMUL_WPT'));
+        break;
+      case 3:
+        matmulProgram = new MatMulPackedProgramCSV3(
+            im2Col.shape, [1, numCols, convInfo.outChannels], true, false,
+            ENV.getNumber('WEBGL_MATMUL_TS'),
+            ENV.getNumber('WEBGL_MATMUL_WPT'));
+        break;
+      case 4:
+        matmulProgram = new MatMulPackedProgramCSV4(
+            im2Col.shape, [1, numCols, convInfo.outChannels], true, false,
+            ENV.getNumber('WEBGL_MATMUL_TS'), ENV.getNumber('WEBGL_MATMUL_TSK'),
+            ENV.getNumber('WEBGL_MATMUL_WPT'));
+        break;
+      default:
+        console.error('WEBGL_MATMUL_VERSION must be 0|1|2|3|4');
+    }
+
     const product =
-        this.compileAndRun<Tensor4D>(matmulProgram, [im2Col, w2Row]);
+        this.compileAndRunCS<Tensor4D>(matmulProgram, [im2Col, w2Row]);
 
     return product.reshape([1, outHeight, outWidth, convInfo.outChannels]);
   }
@@ -1933,6 +2012,20 @@ export class MathBackendWebGL implements KernelBackend {
     if (ENV.getBool('WEBGL_CONV_IM2COL') && x.shape[0] === 1) {
       return this.conv2dWithIm2Row(x, filter, convInfo);
     }
+
+    // Limitations:
+    // 1. Output texture shape must be [NHW, C], which means N*H*W <= maxTexSize
+    // 2. OutWidth should be divisible by localGroupSize[1]
+    // TODO:
+    // 1. Use Conv2DProgram if tensor size is not large enough
+    const maxTexSize = ENV.getNumber('WEBGL_MAX_TEXTURE_SIZE');
+    if (convInfo.batchSize * convInfo.outHeight * convInfo.outWidth <=
+            maxTexSize &&
+        convInfo.outWidth % 7 === 0) {
+      const program = new Conv2DProgramCS(convInfo);
+      return this.compileAndRunCS(program, [x, filter]);
+    }
+
     const program = new Conv2DProgram(convInfo);
     return this.compileAndRun(program, [x, filter]);
   }
@@ -1950,13 +2043,25 @@ export class MathBackendWebGL implements KernelBackend {
 
   depthwiseConv2D(x: Tensor4D, filter: Tensor4D, convInfo: Conv2DInfo):
       Tensor4D {
-    let program: DepthwiseConv2DProgram|DepthwiseConvPacked2DProgram;
+    let program: DepthwiseConv2DProgram|DepthwiseConvPacked2DProgram|
+        DepthwiseConv2DProgramCS;
     if (ENV.getBool('WEBGL_PACK_DEPTHWISECONV') && convInfo.strideWidth <= 2 &&
         convInfo.outChannels / convInfo.inChannels === 1) {
       program = new DepthwiseConvPacked2DProgram(convInfo);
       return this.compileAndRun(
           program, [x, filter],
           this.makePackedTensor(convInfo.outShape, x.dtype));
+    }
+
+    // Limitations:
+    // 1. Output texture shape must be [NHW, C], which means N*H*W <= maxTexSize
+    // 2. OutWidth should be divisible by localGroupSize[1]
+    const maxTexSize = ENV.getNumber('WEBGL_MAX_TEXTURE_SIZE');
+    if (convInfo.batchSize * convInfo.outHeight * convInfo.outWidth <=
+            maxTexSize &&
+        convInfo.outWidth % 7 === 0) {
+      program = new DepthwiseConv2DProgramCS(convInfo);
+      return this.compileAndRunCS(program, [x, filter]);
     }
 
     program = new DepthwiseConv2DProgram(convInfo);

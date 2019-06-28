@@ -148,3 +148,27 @@ ENV.registerFlag('WEBGL_SIZE_UPLOAD_UNIFORM', () => {
   const useUniforms = ENV.getBool('WEBGL_RENDER_FLOAT32_ENABLED');
   return useUniforms ? 4 : 0;
 });
+
+/**
+ * 0: MatMulPackedProgram     - Naive implementation
+ * 1: MatMulPackedProgramCS   - Tiling in the local memory
+ * 2: MatMulPackedProgramCSV2 - More work per thread (square tiles)
+ * 3: MatMulPackedProgramCSV3 - 2D register blocking (square tiles)
+ * 4: MatMulPackedProgramCSV4 - 2D register blocking (rectangular tiles)
+ */
+ENV.registerFlag('WEBGL_MATMUL_VERSION', () => 0);
+
+/**
+ * The following 3 parameters have important effects on the performance
+ * of matrix multiplication and need to be adjusted for different machines.
+ * On Intel(R) HD Graphics 530, {VERSION=4, TS=16, TSK=8, WPT=2} performs
+ * best, with a 23 percent speed increase over version 0.
+ */
+// Tile size in version 1/2/3/4. In version 4, it is equal to TSM and TSN.
+ENV.registerFlag('WEBGL_MATMUL_TS', () => 8);
+
+// Tile size in dimension-K in version 4
+ENV.registerFlag('WEBGL_MATMUL_TSK', () => 8);
+
+// Work per thread in version 2/3/4
+ENV.registerFlag('WEBGL_MATMUL_WPT', () => 2);
