@@ -59,7 +59,8 @@ export class FromPixelsPackedProgram implements GPGPUProgram {
           }
         }
 
-        ${glsl.output} = result;
+        // ${glsl.output} = result;
+        imageStore(${glsl.output}, ivec2(gl_GlobalInvocationID.xy), result);
       }
     `;
   }

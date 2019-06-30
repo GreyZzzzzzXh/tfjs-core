@@ -66,7 +66,7 @@ export class EncodeMatrixPackedProgram implements GPGPUProgram {
 
               flatIndex = getFlatIndex(localCoords);
               offset = imod(flatIndex, 4);
-    
+
               flatIndex /= 4;
               r = flatIndex / ${width};
               c = imod(flatIndex, ${width});
@@ -99,10 +99,11 @@ export class EncodeMatrixPackedProgram implements GPGPUProgram {
         ivec3 localCoords;
         vec2 uv;
         vec4 values;
-        
+
         ${mainLoop}
 
-        ${glsl.output} = ${output};
+        // ${glsl.output} = ${output};
+        imageStore(${glsl.output}, ivec2(gl_GlobalInvocationID.xy), ${output});
       }
     `;
   }

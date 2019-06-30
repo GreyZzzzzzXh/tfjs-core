@@ -63,7 +63,9 @@ export class EncodeMatrixProgram implements GPGPUProgram {
           result = values[3];
         }
 
-        ${glsl.output} = vec4(${output}, 0., 0., 0.);
+        // ${glsl.output} = vec4(${output}, 0., 0., 0.);
+        imageStore(${glsl.output}, ivec2(gl_GlobalInvocationID.xy),
+            vec4(${output}, 0., 0., 0.));
       }
     `;
   }
